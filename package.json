@@ -1,0 +1,31 @@
+{
+  "name": "a3-josephabata",
+  "version": "1.0.0",
+  "description": "Car Tracker with MongoDB persistence and user authentication",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jabata29/a3-JosephAbata.git"
+  },
+  "author": "Joseph Abata",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jabata29/a3-JosephAbata/issues"
+  },
+  "homepage": "https://github.com/jabata29/a3-JosephAbata#readme",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongodb": "^5.8.0",
+    "bcrypt": "^5.1.1",
+    "express-session": "^1.17.3",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
