@@ -7,13 +7,13 @@ or delete your cars. It also shows you some basic stats about your collection.
 - Goal: To make a full stack app where you could log in and manage a list of cars.
 
 - Challenges: Figuring out how to get the front end and back-end to talk to each other without the page refreshing. 
-- Also, getting the session-based login to work correctly took some time. I also initially had trouble with the MongoDB URI.
+Also, getting the session-based login to work correctly took some time. I also initially had trouble with the MongoDB URI.
 
 - Authentication: I just went with a standard session based login. When you log in (or create an account, it does 
-- it automatically), the server gives you a cookie. The server then uses that cookie to remember who you are for future requests.
+it automatically), the server gives you a cookie. The server then uses that cookie to remember who you are for future requests.
 
 - Styling: I used Bootstrap 5. It handles all the responsive stuff and gives you components like cards and modals.
-- I wrote my own main.css file on top of it to change the colors and add a few tweaks to make it look a bit more unique.
+I wrote my own main.css file on top of it to change the colors and add a few tweaks to make it look a bit more unique.
 
 Express Middleware:
 
