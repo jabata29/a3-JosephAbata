@@ -5,17 +5,17 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 require('dotenv').config();
 
-const app = express();
-const port = 3000;
+let app = express();
+const port = process.env.PORT || 3000;
 
-let uri = "mongodb+srv://jabata29:a3-webware@cluster0.8oaxpnm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri);
 
-let db, usersCollection, carsCollection;
+var db, usersCollection, carsCollection;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(express.static("public"));
 
 app.use(session({
     secret: 'secretkey',
@@ -23,11 +23,11 @@ app.use(session({
     saveUninitialized: false,
     cookie: {
         secure: false,
-        maxAge: 24 * 60 * 60 * 1000
+        maxAge: 1000 * 60 * 60 * 24
     }
 }));
 
-function requireAuth(req, res, next) {
+const requireAuth = (req, res, next) => {
     if (req.session.userId) {
         next();
     } else {
@@ -38,8 +38,8 @@ function requireAuth(req, res, next) {
 async function connectDB() {
     try {
         await client.connect();
-        db = client.db('carTrackerDB');
-        usersCollection = db.collection('users');
+        db = client.db("carTrackerDB");
+        usersCollection = db.collection("users");
         carsCollection = db.collection('cars');
 
         console.log('Connected to MongoDB successfully');
@@ -49,26 +49,11 @@ async function connectDB() {
 
     } catch (error) {
         console.error('MongoDB connection error:', error.message);
+        process.exit(1);
     }
 }
 
-let demoData = {
-    users: [],
-    cars: []
-};
-
 async function createUser(username, password) {
-    if (!usersCollection) {
-        const user = {
-            _id: Date.now().toString(),
-            username: username,
-            password: await bcrypt.hash(password, 10),
-            createdAt: new Date()
-        };
-        demoData.users.push(user);
-        return { insertedId: user._id };
-    }
-
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = {
         username: username,
@@ -80,24 +65,24 @@ async function createUser(username, password) {
 }
 
 async function findUser(username) {
-    if (!usersCollection) {
-        return demoData.users.find(u => u.username === username);
-    }
     return await usersCollection.findOne({ username: username });
 }
 
 async function verifyUser(username, password) {
     const user = await findUser(username);
-    if (!user) return null;
+    if (!user) {
+        return null;
+    }
 
     const isValid = await bcrypt.compare(password, user.password);
-    return isValid ? user : null;
+    if(isValid) {
+        return user;
+    } else {
+        return null;
+    }
 }
 
 async function getUserCars(userId) {
-    if (!carsCollection) {
-        return demoData.cars.filter(car => car.userId === userId);
-    }
     return await carsCollection.find({ userId: userId }).toArray();
 }
 
@@ -107,26 +92,11 @@ async function addCar(carData) {
         createdAt: new Date(),
         updatedAt: new Date()
     };
-
-    if (!carsCollection) {
-        car._id = Date.now().toString();
-        demoData.cars.push(car);
-        return { insertedId: car._id };
-    }
-
     const result = await carsCollection.insertOne(car);
     return result;
 }
 
 async function updateCar(carId, updates) {
-    if (!carsCollection) {
-        const carIndex = demoData.cars.findIndex(c => c._id === carId);
-        if (carIndex !== -1) {
-            demoData.cars[carIndex] = { ...demoData.cars[carIndex], ...updates, updatedAt: new Date() };
-        }
-        return { modifiedCount: 1 };
-    }
-
     const result = await carsCollection.updateOne(
         { _id: new ObjectId(carId) },
         {
@@ -140,13 +110,7 @@ async function updateCar(carId, updates) {
 }
 
 async function deleteCar(carId) {
-    if (!carsCollection) {
-        demoData.cars = demoData.cars.filter(c => c._id !== carId);
-        return { deletedCount: 1 };
-    }
-
-    const result = await carsCollection.deleteOne({ _id: new ObjectId(carId) });
-    return result;
+    return await carsCollection.deleteOne({ _id: new ObjectId(carId) });
 }
 
 app.get('/', (req, res) => {
@@ -163,6 +127,8 @@ app.get('/logout', (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
+    console.log('Login attempt for user:', req.body.username);
+
     try {
         const { username, password } = req.body;
 
@@ -173,7 +139,7 @@ app.post('/api/login', async (req, res) => {
         let user = await verifyUser(username, password);
 
         if (user) {
-            req.session.userId = user._id.toString();
+            req.session.userId = String(user._id);
             req.session.username = user.username;
             return res.json({ success: true, message: 'Login successful' });
         } else {
@@ -181,10 +147,10 @@ app.post('/api/login', async (req, res) => {
             if (existingUser) {
                 return res.status(401).json({ success: false, message: 'Invalid password' });
             } else {
-                const result = await createUser(username, password);
-                user = await findUser(username);
-                req.session.userId = user._id.toString();
-                req.session.username = user.username;
+                await createUser(username, password);
+                let newUser = await findUser(username);
+                req.session.userId = String(newUser._id);
+                req.session.username = newUser.username;
                 return res.json({
                     success: true,
                     message: 'New account created successfully',
@@ -198,15 +164,17 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-
 app.get('/api/cars', requireAuth, async (req, res) => {
     try {
         const cars = await getUserCars(req.session.userId);
         const currentYear = new Date().getFullYear();
-        const carsWithAge = cars.map(car => ({
-            ...car,
-            age: currentYear - car.year
-        }));
+        const carsWithAge = cars.map(car => {
+            return {
+                ...car,
+                _id: car._id.toString(),
+                age: currentYear - car.year
+            }
+        });
         res.json(carsWithAge);
     } catch (error) {
         console.error('Error fetching cars:', error);
@@ -216,13 +184,12 @@ app.get('/api/cars', requireAuth, async (req, res) => {
 
 app.post('/api/cars', requireAuth, async (req, res) => {
     try {
-        const { model, year, mpg, fuelType, features } = req.body;
         const carData = {
-            model: model,
-            year: parseInt(year),
-            mpg: parseInt(mpg),
-            fuelType: fuelType || 'gasoline',
-            features: features || [],
+            model: req.body.model,
+            year: parseInt(req.body.year),
+            mpg: parseInt(req.body.mpg),
+            fuelType: req.body.fuelType || 'gasoline',
+            features: req.body.features || [],
             userId: req.session.userId,
             username: req.session.username
         };
@@ -237,16 +204,15 @@ app.post('/api/cars', requireAuth, async (req, res) => {
 
 app.put('/api/cars/:id', requireAuth, async (req, res) => {
     try {
-        const { model, year, mpg, fuelType, features } = req.body;
-        const updates = {
-            model: model,
-            year: parseInt(year),
-            mpg: parseInt(mpg),
-            fuelType: fuelType,
-            features: features || []
-        };
+        const car_id = req.params.id;
+        const updates = {};
+        updates.model = req.body.model;
+        updates.year = parseInt(req.body.year);
+        updates.mpg = parseInt(req.body.mpg);
+        updates.fuelType = req.body.fuelType;
+        updates.features = req.body.features || [];
 
-        const result = await updateCar(req.params.id, updates);
+        await updateCar(car_id, updates);
         res.json({ success: true });
     } catch (error) {
         console.error('Error updating car:', error);
@@ -256,7 +222,7 @@ app.put('/api/cars/:id', requireAuth, async (req, res) => {
 
 app.delete('/api/cars/:id', requireAuth, async (req, res) => {
     try {
-        const result = await deleteCar(req.params.id);
+        await deleteCar(req.params.id);
         res.json({ success: true });
     } catch (error) {
         console.error('Error deleting car:', error);
@@ -267,7 +233,7 @@ app.delete('/api/cars/:id', requireAuth, async (req, res) => {
 app.get('/health', (req, res) => {
     res.json({
         status: 'OK',
-        mongodb: !!usersCollection ? 'connected' : 'demo mode',
+        mongodb: db ? 'connected' : 'disconnected',
         timestamp: new Date().toISOString()
     });
 });
@@ -276,8 +242,6 @@ async function startServer() {
     await connectDB();
     app.listen(port, () => {
         console.log(`Server running on http://localhost:${port}`);
-        console.log(`Check to make sure server works: http://localhost:${port}/health`);
-        console.log(`MongoDB: ${usersCollection ? 'Connected' : 'Demo mode'}`);
     });
 }
 
