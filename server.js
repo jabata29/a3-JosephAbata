@@ -6,31 +6,19 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 
-// Better MongoDB connection handling
-let uri;
-if (process.env.MONGODB_URI) {
-    uri = process.env.MONGODB_URI;
-} else {
-    // Fallback for development
-    console.log('❌ MONGODB_URI not found in environment variables');
-    console.log('💡 Please create a .env file with your MongoDB connection string');
-    uri = "mongodb://localhost:27017/carTrackerDB";
-}
-
+let uri = "mongodb+srv://jabata29:a3-webware@cluster0.8oaxpnm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 const client = new MongoClient(uri);
 
 let db, usersCollection, carsCollection;
 
-// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Session configuration with fallback
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'fallback-secret-key-for-development-only',
+    secret: 'secretkey',
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -39,7 +27,6 @@ app.use(session({
     }
 }));
 
-// Authentication middleware
 function requireAuth(req, res, next) {
     if (req.session.userId) {
         next();
@@ -48,45 +35,29 @@ function requireAuth(req, res, next) {
     }
 }
 
-// Connect to MongoDB with better error handling
 async function connectDB() {
     try {
-        console.log('🔗 Attempting to connect to MongoDB...');
-        console.log('📝 Connection string:', uri.replace(/:[^:]*@/, ':****@')); // Hide password in logs
-
         await client.connect();
         db = client.db('carTrackerDB');
         usersCollection = db.collection('users');
         carsCollection = db.collection('cars');
 
-        console.log('✅ Connected to MongoDB successfully!');
+        console.log('Connected to MongoDB successfully');
 
-        // Create indexes
         await usersCollection.createIndex({ username: 1 }, { unique: true });
         await carsCollection.createIndex({ userId: 1 });
 
     } catch (error) {
-        console.error('❌ MongoDB connection error:', error.message);
-        console.log('💡 Tips for fixing:');
-        console.log('   1. Check your MONGODB_URI in .env file');
-        console.log('   2. Make sure your MongoDB Atlas cluster is running');
-        console.log('   3. Check your IP is whitelisted in MongoDB Atlas');
-        console.log('   4. Verify your username and password are correct');
-
-        // Don't exit the process - let the server run in "demo mode"
-        console.log('🔄 Starting server in demo mode (data will not persist)');
+        console.error('MongoDB connection error:', error.message);
     }
 }
 
-// Demo data for when MongoDB is not available
 let demoData = {
     users: [],
     cars: []
 };
 
-// User authentication functions
 async function createUser(username, password) {
-    // If MongoDB is not connected, use demo data
     if (!usersCollection) {
         const user = {
             _id: Date.now().toString(),
@@ -123,7 +94,6 @@ async function verifyUser(username, password) {
     return isValid ? user : null;
 }
 
-// Car CRUD operations
 async function getUserCars(userId) {
     if (!carsCollection) {
         return demoData.cars.filter(car => car.userId === userId);
@@ -179,7 +149,6 @@ async function deleteCar(carId) {
     return result;
 }
 
-// Routes
 app.get('/', (req, res) => {
     if (req.session.userId) {
         res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
@@ -193,7 +162,6 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// API Routes
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -230,7 +198,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// ... rest of your API routes (same as before)
 
 app.get('/api/cars', requireAuth, async (req, res) => {
     try {
@@ -297,7 +264,6 @@ app.delete('/api/cars/:id', requireAuth, async (req, res) => {
     }
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
     res.json({
         status: 'OK',
@@ -306,13 +272,12 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Start server
 async function startServer() {
     await connectDB();
     app.listen(port, () => {
-        console.log(`🚀 Server running on http://localhost:${port}`);
-        console.log(`📊 Health check: http://localhost:${port}/health`);
-        console.log(`💾 MongoDB: ${usersCollection ? 'Connected' : 'Demo mode'}`);
+        console.log(`Server running on http://localhost:${port}`);
+        console.log(`Check to make sure server works: http://localhost:${port}/health`);
+        console.log(`MongoDB: ${usersCollection ? 'Connected' : 'Demo mode'}`);
     });
 }
 
