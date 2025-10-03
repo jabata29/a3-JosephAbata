@@ -1,5 +1,5 @@
 ## Car Tracker
-https://railway.com/invite/mYgBmNTRK1z
+https://a3-josephabata-production.up.railway.app/
 
 This is a simple app I built to track a car collection. You can sign up (it's automatic), log in, and then add, edit, 
 or delete your cars. It also shows you some basic stats about your collection.
